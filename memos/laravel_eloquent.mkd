@@ -1,0 +1,102 @@
+# Laravel Eloquent
+ActiveRecord を実装できる ORM。
+
+## テーブルとタイムスタンプ
+* テーブル名はクラス名を複数形のスネークケースにした形とする
+* `protected $table` プロパティで任意のテーブル名を指定することができる
+* 各テーブルには必ず`id`カラムをプライマリーキーとして定義する
+* デフォルトでは`updated_at`カラムと`created_at`カラムを定義し、タイムスタンプを自動的に更新するようにする
+* タイムスタンプフォーマットはデフォルトでは`Y-m-d H:i:s`
+* タイムスタンプフォーマットは`public function getDateFormat()`メソッドでカスタマイズ可能
+* `updated_at`カラムと`created_at`カラムを設けない場合は`public $timestamps = false;`とする
+**e.g. Account モデルを作成**
+```php
+class Account extends Eloquent
+{
+  // If $table property is not defined, the table name is 'accounts' by default.
+  protected $table = 'normal_accounts';
+  public function getDateFormat()
+  {
+    return 'U';
+  }
+}
+```
+
+## 例外
+* `Eloquent::findOrFail`メソッド等を利用し、モデルが見つからなかったときに404ページを表示させる
+* `App::error`ハンドラーに`ModelNotFoundException`の例外ハンドラーを登録する
+* 例外オブジェクトのエイリアス定義は`use Illuminate\Database\Eloquent\ModelNotFoundException;`
+**e.g. 例外処理を想定したコーディング**
+
+```php
+// get_account_data.php
+// If no data is found, then throw ModelNotFoundException.
+$model = Account::findOrFail(1);
+```
+```php
+// exception.php
+// Register a exception handler which renders 'Not Found' message in 404 page.
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+App::error(function(ModelNotFoundException $e)
+{
+  return Response::make('No account found. Aborted.', 404);
+});
+```
+
+## Mass Assignment
+Mass Assignment 脆弱性を防止するために、ホワイト/ブラックリスト形式で変更可能な属性を指定できるようになっている。
+
+* 変更可能な属性は`protected $fillable = array(...);`と定義する
+* 変更不可能な属性は`projected $guarded = array(...);`と定義する
+* どの属性も変更させたくない場合は`$guarded`プロパティに対し`array('*')`を定義する
+
+## アクセサとミューテータ
+モデル属性のアクセサ/ミューテータを定義し、属性値の取得/設定時に内容を変更することができる。
+
+* アクセサ/ミューテータのメソッド名はキャメルケースで`getFooAttribute`/`setFooAttribute`とし、Foo は任意の属性名とする
+
+**e.g. アクセサとミューテータの定義**
+```php
+class Account extends Eloquent
+{
+  // Change a attribute value.
+  // The model attribute is named 'screen_name' but the method name must be camel case (change to 'ScreenName').
+  public getScreenNameAttribute($value)
+  {
+    return ucFirst($value);
+  }
+
+  public setScreenNameAttribute($value)
+  {
+    $this->attributes['screen_name'] = strtolower($value);
+  }
+```
+
+## モデルイベントとモデルオブザーバ
+
+
+## 配列とJSON
+モデル/モデルコレクションを配列か JSON に変換することができる。
+
+* 配列への変換には`toArray`メソッドを用いる
+* JSON への変換には`toJson`メソッドを用いる
+* 変換の際に特定の属性を除くには`protected $hidden`プロパティに対し属性名を含んだ配列を定義する
+* 変換の際に特定の属性を含むには`protected $visible`プロパティに対し属性名を含んだ配列を定義する
+
+**e.g. 変換の例**
+
+```php
+class Account extends Eloquent
+{
+  // Exclude 'password' attribute when converting this model to an array or parsing as JSON.
+  protected $hidden = array('password');
+}
+```
+
+```php
+$account = Account::find(1);
+// Convert to an array.
+$array = $account->toArray();
+// Parse as JSON.
+$json = $account->toJson();
+```
